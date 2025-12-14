@@ -46,7 +46,7 @@ use Bio::Tools::GuessSeqFormat;
 my @CMDLINE = ($0, @ARGV);
 my $OPSYS = $^O;
 my $EXE = $FindBin::RealScript;
-my $VERSION = "1.15.5";
+my $VERSION = "1.15.6";
 my $AUTHOR = 'Torsten Seemann <torsten.seemann@gmail.com>';
 my $URL = 'https://github.com/tseemann/prokka';
 my $PROKKA_PMID = '24642063';
@@ -1659,8 +1659,15 @@ sub setup_db {
   }
 
   check_tool('hmmpress');
-  for my $hmm (<$dbdir/hmm/*.hmm>) {
+  for my $hmm (<$dbdir/hmm/*.{hmm,hmm.gz}>) {
     msg("Pressing HMM database: $hmm");
+    # We may need to uncompress first
+    if ($hmm =~ m/^(.*?)\.gz$/) {
+      msg("Uncompressing: $hmm");
+      my $hmm_u = $1;
+      runcmd("gzip -dc \Q$hmm\E > \Q$hmm_u\E");
+      $hmm = $hmm_u;
+    }
     runcmd("hmmpress \Q$hmm\E");
   }
 

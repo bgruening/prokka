@@ -1,6 +1,7 @@
 
 
 DIR := ../db/kingdom
+DIR_HMM := ../db/hmm
 DIR_B := $(DIR)/Bacteria
 DIR_A := $(DIR)/Archaea
 DIR_V := $(DIR)/Viruses
@@ -14,19 +15,32 @@ CP := cp -vf
 
 .PHONY: install all
 
-
-ALL := AMR sprot_b sprot_v sprot_a
+ALL := AMR sprot_b sprot_v sprot_a HAMAP.hmm.gz
 
 all: $(ALL)
 
 install : $(ALL)
-	$(CP) AMR $(DIR_B)/AMR
+	$(CP) HAMAP.hmm.gz $(DIR_HMM)/
+	$(CP) AMR $(DIR_B)/
 	$(CP) sprot_b $(DIR_B)/sprot
 	$(CP) sprot_a $(DIR_A)/sprot
 	$(CP) sprot_v $(DIR_V)/sprot
 #	$(CP) sprot_m $(DIR_M)/sprot
-	
 
+HAMAP.hmm.gz : HAMAP.hmm
+	pigz -9 < $< > $@
+
+HAMAP.hmm : hamap_rules.dat rules_index.dat hamap_seed_alignments.tar.gz
+	../bin/prokka-hamap_to_hmm 
+
+hamap_rules.dat :
+	wget https://ftp.expasy.org/databases/hamap/hamap_rules.dat
+
+rules_index.dat :
+	wget https://ftp.expasy.org/databases/hamap/rules_index.dat
+	
+hamap_seed_alignments.tar.gz :
+	wget https://ftp.expasy.org/databases/hamap/hamap_seed_alignments.tar.gz
 
 AMR: AMRProt.fa
 	./AMRprot-to-AMR.pl $< > $@
@@ -54,5 +68,3 @@ uniprot_sprot_virsues.dat.gz :
 			
 clean :
 	rm -f $(ALL)
-	
-	

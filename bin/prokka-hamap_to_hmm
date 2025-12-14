@@ -6,32 +6,44 @@ use Bio::SeqIO;
 use Data::Dumper;
 use File::Temp qw(tempdir);
 
-my(@Options, $verbose, $datadir, $hypo, $sep, $blank, $pseudo, $minlen);
+my(@Options, $verbose, $datadir, $hypo, $sep, $blank, 
+             $pseudo, $minlen, $seeds, $index, $rules);
 setOptions();
 
 $datadir or die "please specify HAMAP --datadir";
 -d $datadir or die "--datadir $datadir is not a valid folder";
+$seeds or die "need --seeds .tgz file";
+$index or die "need --index .dat file";
+$rules or die "need --rules .dat file";
 
 my $dir = tempdir(CLEANUP=>1);
 print STDERR "Using $dir as temp folder.\n";
 
+
 my %DESC;
-my $ali_fh = get_file("alignment_id.dat", "alignment /gene /product info");
+my $ali_fh = get_file($index, "alignment /gene /product info");
 while (<$ali_fh>) {
+  #0	MF_00001
+  #1	MF_00001
+  #2	28
+  #3	PYRB
+  #4	pyrB
+  #5	Aspartate carbamoyltransferase [pyrB]
   chomp;
   my @x = split m/\t/;
-  next if $x[5] =~ m/UPF\d+|homolog|[@<\[]/;
+  $x[5] =~ s/\s\[\w+\]$//;
+  next if $x[5] =~ m/UPF\d+|homolog/;
   $x[5] =~ s/^probable\s+//gi;
   $DESC{ $x[0] } = "$sep$x[4]$sep$x[5]";
 }
-printf STDERR "Accepted descriptions for %d families\n", scalar keys %DESC;
+printf STDERR "Accepted descriptions for %d families\n", scalar keys %DESC;;
 
-my $fam_fh = get_file("hamap_families.dat", "alignment /EC_number");
+my $fam_fh = get_file($rules, "alignment /EC_number");
 my($AC,$EC,$Bac);
 while (<$fam_fh>) {
   chomp;
   if (m{^//}) {
-    #print STDERR "AC=$AC EC=$EC Bac=$Bac\n";
+    print STDERR "AC=$AC EC=$EC Bac=$Bac\n";
     if ($AC and $EC and exists $DESC{$AC}) {
       $DESC{$AC} = $EC.$DESC{$AC}; 
     }
@@ -53,7 +65,7 @@ while (<$fam_fh>) {
 }
 printf STDERR "%d models made it through filtering\n", scalar keys %DESC;
 
-my $aln_file = "$datadir/hamap_seed_alignments.tar.gz";
+my $aln_file = $seeds;
 if (-r $aln_file) {
   print STDERR "Extracting $aln_file.\n";
   system("tar -C $dir --strip-components 1 -zxf $aln_file")==0 or die "ERROR: $?";
@@ -83,9 +95,10 @@ else {
 }
 
 my $dest = 'HAMAP.hmm';
-print STDERR "Combining into $dest\n";
-system("cat $dir/*.hmm > $dest");
-
+print STDERR "Combining into $dest.ascii\n";
+system("cat $dir/*.hmm > $dest.ascii");
+print STDERR "Converting to binary $dest\m";
+system("hmmconvert -b $dest.ascii > $dest.hmm");
 
 print STDERR "Done.\n";
 
@@ -93,13 +106,13 @@ print STDERR "Done.\n";
 
 sub get_file {
   my($pattern, $desc) = @_;
-  my($first) = glob("$datadir/$pattern");
+  my($first) = glob("$pattern");
   if ($first and -r $first) {
     print STDERR "Found $desc: $first\n";
     open my $fh, '<', $first;
     return $fh;
   }
-  die "Problem finding $pattern in $datadir ($desc)";
+  die "Problem finding '$pattern'";
 }
 
 #----------------------------------------------------------------------
@@ -111,7 +124,10 @@ sub setOptions {
   @Options = (
     {OPT=>"help",      VAR=>\&usage,                   DESC=>"This help"},
     {OPT=>"verbose!",  VAR=>\$verbose, DEFAULT=>0,     DESC=>"Verbose progress"},
-    {OPT=>"datadir=s", VAR=>\$datadir, DEFAULT=>'',    DESC=>"Path to downloaded HAMAP folder (ftp://ftp.expasy.org/databases/hamap/)" },
+    {OPT=>"datadir=s", VAR=>\$datadir, DEFAULT=>'hamap_seed_alignments',    DESC=>"Path to downloaded HAMAP folder (ftp://ftp.expasy.org/databases/hamap/)" },
+    {OPT=>"seeds=s", VAR=>\$seeds, DEFAULT=>'hamap_seed_alignments.tar.gz',    DESC=>"Seed alignments .tgz" },
+    {OPT=>"index=s", VAR=>\$index, DEFAULT=>'rules_index.dat',    DESC=>"Index file" },
+    {OPT=>"rules=s", VAR=>\$rules, DEFAULT=>'hamap_rules.dat',    DESC=>"Rules file" },
     {OPT=>"sep=s",     VAR=>\$sep,     DEFAULT=>'~~~', DESC=>"Separator between EC/gene/product" },
     {OPT=>"blank=s",   VAR=>\$blank,   DEFAULT=>'',    DESC=>"Replace empty EC/gene/product with this"},
 #    {OPT=>"pseudo!",   VAR=>\$pseudo,  DEFAULT=>0,     DESC=>"Include /pseudo genes"},
