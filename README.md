@@ -28,7 +28,7 @@ developed
 which is a modern version of Prokka with better
 tooling and maintained databases, including
 `db-light` which is in the spirit of Prokka's
-:fast and lean" approach. I recommend replacing
+"fast and lean" approach. I recommend replacing
 Prokka with Bakta in your analysis pipelines
 going forward.
 
